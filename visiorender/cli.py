@@ -25,9 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog='visiorender',
         description='Render a Visio .vsdx file to PNG without Visio, or '
                     'become the program that opens .vsdx files.',
-        epilog="mode 'full' renders the whole page including the pictures it "
-               'embeds (raster parts and EMF/WMF are decoded automatically); '
-               '--media substitutes your own PNG for every embedded picture.',
+        epilog='Both modes draw the pictures the page embeds (raster parts and '
+               'EMF/WMF are decoded automatically); --media substitutes your '
+               'own PNG for every embedded picture.',
     )
     p.add_argument('src', nargs='?', help='path to the .vsdx file')
     p.add_argument('-o', '--out', default=None,
@@ -35,11 +35,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument('--dpi', type=float, default=200.0,
                    help='pixels per Visio inch (default: 200)')
     p.add_argument('--mode', choices=('vector', 'full'), default='vector',
-                   help="'vector' crops to the drawn shapes, 'full' renders the whole page")
+                   help="'vector' crops to the drawn shapes and pictures, "
+                        "'full' renders the whole page")
     p.add_argument('--media', default=None,
                    help='PNG to substitute for every embedded picture '
-                        '(mode=full only; by default embedded pictures are '
-                        'decoded from the package)')
+                        '(by default embedded pictures are decoded from the '
+                        'package)')
     p.add_argument('--shadow-mode', choices=SHADOW_MODES, default='explicit',
                    help="'explicit' shadows only where the file asks for them "
                         "(default), 'all' on every filled shape, 'none' off")

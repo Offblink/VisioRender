@@ -128,7 +128,7 @@ Visio 自己算好的四个数写在实例里。**不要**用 `LocPinY` 推：1-
 `--unregister` 的还原边界：`UserChoice` 的哈希无法伪造，所以只能让它保持缺失 ——
 后果无损（`HKLM\.vsdx` 默认仍是 `VisioViewer.Viewer`，即注册前的行为）。
 
-## 嵌入图片：自动提取与 GDI+ 解码（full 模式）
+## 嵌入图片：自动提取与 GDI+ 解码（两种模式）
 
 改这条链时发现两个**一直存在、但从未被执行到**的 bug（旧代码把关系解析进 `_src` 就丢掉，
 所以从没暴露）：
@@ -159,11 +159,17 @@ gdiplus.dll **不导出** `GdipDeleteBitmap`（实测 AttributeError）。
 - 字节对账（同参渲染前后 SHA-256）：夹具 full、ouro full+`--media`（override 路径）、
   ouro vector 三条**不变**；ouro full 无 `--media` 从空白变贴图，且与手动
   `--media image1.png` 的输出**字节一致**。
-- 契约：给了 `--media` → 整页覆盖（一个 PNG 顶掉所有贴图）；不给 → 每个 Foreign 各取各的
-  关系图（多图页各贴各的）。解不出的部件 → 留白 + stderr
+- 契约：**两种模式**都画嵌入图片，并把它算进 vector 的裁剪外接框（vector 只裁剪内容，
+  不再顺带丢内容 —— v0.1.1 之前 `foreign` 只在 full 分支收集，双击默认走的 vector 会把贴图
+  整个跳过）；给了 `--media` → 一个 PNG 顶掉所有贴图；不给 → 每个 Foreign 各取各的关系图
+  （多图页各贴各的）。解不出的部件 → 留白 + stderr
   `warning: cannot decode embedded picture: <part>`。
-- 测试 `tests/test_media.py`（5 项）：包由 `make_fixture.build()` 重封、页换成单个 Foreign；
-  EMF 用例的 EMF 是测试用 gdi32 `CreateEnhMetaFileW` **现录的红矩形**，不夹第三方文件。
+- v0.1.2 的字节对账：夹具 full/vector、ouro full（有/无 `--media`）四条 SHA-256 与改前一致；
+  ouro vector 从 1609x1203 变 2040x4243（照片进外接框），且照片落点区域与原生解码图
+  **逐像素 0 差异**。
+- 测试 `tests/test_media.py`（7 项）：包由 `make_fixture.build()` 重封、页换成单个 Foreign；
+  EMF 用例的 EMF 是测试用 gdi32 `CreateEnhMetaFileW` **现录的红矩形**，不夹第三方文件；
+  另有两项钉 vector 语义（只含贴图时的画布=贴图+边距、图形与贴图并存时外接框取并集且两者都画）。
 
 ## launcher 为什么写成一个文件
 
@@ -196,7 +202,7 @@ gdiplus.dll **不导出** `GdipDeleteBitmap`（实测 AttributeError）。
 ## 回归命令
 
 ```
-python -m pytest -q          # 24 passed
+python -m pytest -q          # 26 passed
 ruff check .                 # All checks passed!
 ```
 

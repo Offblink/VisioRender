@@ -19,9 +19,9 @@ docs\demo.png  600x400 px  7 shapes  100 px/in  mode=full
 ```
 
 一行从左到右是：输出路径、画布尺寸（宽×高）、这个包里画了多少个形状、密度（一英寸多少像素）；
-末尾的 `mode=full` 只在用整页模式时出现。默认模式会把画布裁到图形的外接框，所以宽高比不一定等于纸张。
-`full` 模式还会把页面里**嵌的图片一并解码贴回去**（PNG/JPEG 用 Pillow，EMF/WMF 用系统自带的
-GDI+，不用你做任何转换）；想换成自己的图用 `--media`。
+末尾的 `mode=full` 只在用整页模式时出现。默认模式会把画布裁到图形与嵌入图片的外接框，
+所以宽高比不一定等于纸张。两种模式都会把页面里**嵌的图片一并解码贴回去**（PNG/JPEG 用 Pillow，
+EMF/WMF 用系统自带的 GDI+，不用你做任何转换）；想换成自己的图用 `--media`。
 
 不想敲 `python -m`，装完就是：
 
@@ -35,7 +35,7 @@ $ visiorender 图.vsdx
 **[⬇ 下载发行包](https://github.com/Offblink/VisioRender/releases/latest)** 里的 wheel：
 
 ```
-pip install visiorender-0.1.1-py3-none-any.whl
+pip install visiorender-0.1.2-py3-none-any.whl
 ```
 
 或者从源码装：
@@ -59,8 +59,8 @@ visiorender <src.vsdx> [-o OUT.png] [--dpi N] [--mode vector|full] [--media PNG]
 |---|---|---|
 | `-o, --out` | `<输入名>.png` | 输出路径，必须是 `.png` |
 | `--dpi` | `200` | 一英寸多少像素（Visio 图是矢量的，多高都清晰） |
-| `--mode` | `vector` | `vector` 裁到图形外接框；`full` 渲染整页纸 |
-| `--media` | 无 | 用你给的 PNG 覆盖页面里所有嵌入图片（默认自动解码包内的；仅 `full` 有效） |
+| `--mode` | `vector` | `vector` 裁到图形与嵌入图片的外接框；`full` 渲染整页纸 |
+| `--media` | 无 | 用你给的 PNG 覆盖页面里所有嵌入图片（默认自动解码包内的） |
 | `--shadow-mode` | `explicit` | `explicit` 只画文件明确要求的阴影；`all` 所有实心图形都画；`none` 全不画 |
 | `--shadow-alpha` | `0.16` | 阴影最深处的不透明度（0~1） |
 | `--shadow-blur` | `0.030` | 阴影模糊半径，单位英寸 |
@@ -140,7 +140,7 @@ opened 图.png
 ## 想改它
 
 - 逆向出来的 Visio 语义、调参账本、验证方法：`NOTES.md`
-- 自检与回归：`python -m pytest`（24 项）+ `ruff check .`
+- 自检与回归：`python -m pytest`（26 项）+ `ruff check .`
 - 夹具 `tests/fixtures/demo.vsdx` 由 `tests/make_fixture.py` **从零生成**，不夹带任何第三方母版
 
 ## 许可

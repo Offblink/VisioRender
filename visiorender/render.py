@@ -202,10 +202,10 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
            shadow_mode='explicit', shadow_alpha=0.16, shadow_blur=0.030):
     """Rasterise ``src`` into ``out``.
 
-    mode='vector' renders the drawn shapes only (cropped to their bbox);
-    mode='full' renders the whole page, decoding and pasting each picture the
-    page embeds (raster parts with Pillow, EMF/WMF with GDI+).  ``media``
-    overrides that: your PNG replaces every embedded picture.
+    mode='vector' renders the drawn shapes and the embedded pictures, cropped
+    to their bbox; mode='full' renders the whole page.  Embedded pictures are
+    decoded from the package (raster parts with Pillow, EMF/WMF with GDI+);
+    ``media`` overrides that: your PNG replaces every embedded picture.
 
     shadow_mode: 'explicit' (only shapes carrying ShdwPattern=1), 'all',
     or 'none'.  Returns (out_path, (width, height), shape_count).
@@ -449,7 +449,30 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
         })
 
     # ---------------- canvas --------------------------------------------------
+    # pasted pictures (Type='Foreign') are page content in both modes, so the
+    # vector bbox has to account for them: cropping crops, it does not drop
     foreign = []
+    rels = {}
+    for n in z.namelist():
+        if n.startswith('visio/pages/_rels/') and n.endswith('.rels'):
+            for r in ET.fromstring(z.read(n)):
+                if r.get('Type', '').endswith('/image'):
+                    t = r.get('Target')
+                    rels[r.get('Id')] = (t.lstrip('/') if t.startswith('/')
+                                         else posixpath.normpath(
+                                             n.rsplit('_rels/', 1)[0] + t))
+    for sh in shapes:
+        if sh.get('Type') != 'Foreign':
+            continue
+        c = cells_of(sh)
+        w, h = float(c['Width'][0]), float(c['Height'][0])
+        px, py = float(c['PinX'][0]), float(c['PinY'][0])
+        src = None
+        # the relationship lives inside <ForeignData>, not under <Shape>
+        for r in sh.iter(V + 'Rel'):
+            src = rels.get(r.get(R + 'id'))
+        foreign.append((px - w / 2, py - h / 2, w, h, src))
+
     if MODE == 'full':
         pxml = ET.fromstring(z.read('visio/pages/pages.xml'))
         ps = pxml.find('.//' + V + 'PageSheet')
@@ -457,30 +480,11 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
         minx, maxx = 0.0, float(pc['PageWidth'][0])
         miny, maxy = 0.0, float(pc['PageHeight'][0])
         MARGIN = 0.0
-        # pasted pictures (Type='Foreign')
-        rels = {}
-        for n in z.namelist():
-            if n.startswith('visio/pages/_rels/') and n.endswith('.rels'):
-                for r in ET.fromstring(z.read(n)):
-                    if r.get('Type', '').endswith('/image'):
-                        t = r.get('Target')
-                        rels[r.get('Id')] = (t.lstrip('/') if t.startswith('/')
-                                             else posixpath.normpath(
-                                                 n.rsplit('_rels/', 1)[0] + t))
-        for sh in shapes:
-            if sh.get('Type') != 'Foreign':
-                continue
-            c = cells_of(sh)
-            w, h = float(c['Width'][0]), float(c['Height'][0])
-            px, py = float(c['PinX'][0]), float(c['PinY'][0])
-            src = None
-            # the relationship lives inside <ForeignData>, not under <Shape>
-            for r in sh.iter(V + 'Rel'):
-                src = rels.get(r.get(R + 'id'))
-            foreign.append((px - w / 2, py - h / 2, w, h, src))
     else:
         xs = [p[0] for it in items for p in it['pts']]
         ys = [p[1] for it in items for p in it['pts']]
+        xs += [v for fx, fy, fw, fh, _src in foreign for v in (fx, fx + fw)]
+        ys += [v for fx, fy, fw, fh, _src in foreign for v in (fy, fy + fh)]
         minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
         MARGIN = 0.35
     Wpx = int((maxx - minx + 2 * MARGIN) * SU)
@@ -488,7 +492,7 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
     img = Image.new('RGB', (Wpx, Hpx), 'white')
     d = ImageDraw.Draw(img, 'RGBA')
 
-    if MODE == 'full' and foreign:
+    if foreign:
         override = Image.open(MEDIA_PNG).convert('RGB') if MEDIA_PNG else None
         pics = {}
         for fx, fy, fw, fh, src in foreign:
