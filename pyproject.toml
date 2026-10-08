@@ -1,6 +1,6 @@
 [project]
 name = "visiorender"
-version = "0.1.0"
+version = "0.1.1"
 description = "把 Visio .vsdx 画成 PNG —— 不用装 Visio"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -128,6 +128,43 @@ Visio 自己算好的四个数写在实例里。**不要**用 `LocPinY` 推：1-
 `--unregister` 的还原边界：`UserChoice` 的哈希无法伪造，所以只能让它保持缺失 ——
 后果无损（`HKLM\.vsdx` 默认仍是 `VisioViewer.Viewer`，即注册前的行为）。
 
+## 嵌入图片：自动提取与 GDI+ 解码（full 模式）
+
+改这条链时发现两个**一直存在、但从未被执行到**的 bug（旧代码把关系解析进 `_src` 就丢掉，
+所以从没暴露）：
+
+1. **`<Rel>` 藏在 `<ForeignData>` 里**，不是 `<Shape>` 的直接子元素 —— `sh.findall(V+'Rel')`
+   恒为空（实测 ouro.vsdx：子元素只有 Cell×20、Section、ForeignData）。改成 `sh.iter(V+'Rel')`。
+2. **关系路径丢了 `../`** —— `rsplit('_rels/',1)[0] + Target.replace('../','')` 得到
+   `visio/pages/media/image1.emf`（不存在）；正解 `posixpath.normpath(prefix + target)`
+   → `visio/media/image1.emf`。根绝对目标（`/visio/...`）lstrip 即可。
+
+解码两路（`media.py`）：PNG/JPEG/GIF/BMP/TIFF → Pillow（RGBA 先合到白底）；
+EMF/WMF → ctypes 调 `gdiplus.dll`：`GdipLoadImageFromFile`（字节落临时文件）→
+画到 `GdipCreateBitmapFromScan0` 的 32bppARGB 位图（先 `GdipGraphicsClear` 不透明白）→
+`GdipBitmapLockBits` 抠 BGRA 转 RGB。两个图都用 **`GdipDisposeImage`** 释放 ——
+gdiplus.dll **不导出** `GdipDeleteBitmap`（实测 AttributeError）。
+
+### ctypes 的坑：症状是静默白图，不抛异常
+
+- **REAL 参数必须设 argtypes**：`GdipDrawImageRect` 的 x/y/w/h 是 float；不设 argtypes 时
+  ctypes 把 Python int 按 C int 传，目的矩形变成 ~0 的垃圾浮点，GDI+ 返回
+  `GenericError=2`，输出 0 个非白像素。设 `[c_void_p, c_void_p, c_float×4]` 后 status=0。
+- `finally` 里句柄判空要判 `.value`：`c_void_p(0)` 恒为真，会对 NULL 调释放。
+
+### 验证账本
+
+- 同一张 EMF（ouro.vsdx 的 `image1.emf`，1801×1125）：本路径 vs PowerShell
+  `System.Drawing` 参考 —— **逐像素 max diff 0，2,026,125 像素零差异**。
+- 字节对账（同参渲染前后 SHA-256）：夹具 full、ouro full+`--media`（override 路径）、
+  ouro vector 三条**不变**；ouro full 无 `--media` 从空白变贴图，且与手动
+  `--media image1.png` 的输出**字节一致**。
+- 契约：给了 `--media` → 整页覆盖（一个 PNG 顶掉所有贴图）；不给 → 每个 Foreign 各取各的
+  关系图（多图页各贴各的）。解不出的部件 → 留白 + stderr
+  `warning: cannot decode embedded picture: <part>`。
+- 测试 `tests/test_media.py`（5 项）：包由 `make_fixture.build()` 重封、页换成单个 Foreign；
+  EMF 用例的 EMF 是测试用 gdi32 `CreateEnhMetaFileW` **现录的红矩形**，不夹第三方文件。
+
 ## launcher 为什么写成一个文件
 
 - 注册的命令走 `pythonw.exe`（双击不闪黑框），**没有控制台** → 异常必须落盘，
@@ -159,7 +196,7 @@ Visio 自己算好的四个数写在实例里。**不要**用 `LocPinY` 推：1-
 ## 回归命令
 
 ```
-python -m pytest -q          # 19 passed
+python -m pytest -q          # 24 passed
 ruff check .                 # All checks passed!
 ```
 

@@ -8,12 +8,16 @@ module reproduces (and the places it approximates) are documented in NOTES.md.
 from __future__ import annotations
 
 import math
+import posixpath
 import re
+import sys
 import xml.etree.ElementTree as ET
 import zipfile
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+
+from .media import decode_part
 
 V = '{http://schemas.microsoft.com/office/visio/2012/main}'
 R = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
@@ -199,8 +203,9 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
     """Rasterise ``src`` into ``out``.
 
     mode='vector' renders the drawn shapes only (cropped to their bbox);
-    mode='full' renders the whole page and pastes ``media`` (an EMF already
-    converted to PNG) wherever the page embeds a picture.
+    mode='full' renders the whole page, decoding and pasting each picture the
+    page embeds (raster parts with Pillow, EMF/WMF with GDI+).  ``media``
+    overrides that: your PNG replaces every embedded picture.
 
     shadow_mode: 'explicit' (only shapes carrying ShdwPattern=1), 'all',
     or 'none'.  Returns (out_path, (width, height), shape_count).
@@ -458,7 +463,10 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
             if n.startswith('visio/pages/_rels/') and n.endswith('.rels'):
                 for r in ET.fromstring(z.read(n)):
                     if r.get('Type', '').endswith('/image'):
-                        rels[r.get('Id')] = n.rsplit('_rels/', 1)[0] + r.get('Target').replace('../', '')
+                        t = r.get('Target')
+                        rels[r.get('Id')] = (t.lstrip('/') if t.startswith('/')
+                                             else posixpath.normpath(
+                                                 n.rsplit('_rels/', 1)[0] + t))
         for sh in shapes:
             if sh.get('Type') != 'Foreign':
                 continue
@@ -466,7 +474,8 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
             w, h = float(c['Width'][0]), float(c['Height'][0])
             px, py = float(c['PinX'][0]), float(c['PinY'][0])
             src = None
-            for r in sh.findall(V + 'Rel'):
+            # the relationship lives inside <ForeignData>, not under <Shape>
+            for r in sh.iter(V + 'Rel'):
                 src = rels.get(r.get(R + 'id'))
             foreign.append((px - w / 2, py - h / 2, w, h, src))
     else:
@@ -479,9 +488,20 @@ def render(src, out, *, dpi=200.0, mode='vector', media=None,
     img = Image.new('RGB', (Wpx, Hpx), 'white')
     d = ImageDraw.Draw(img, 'RGBA')
 
-    if MODE == 'full' and MEDIA_PNG:
-        pic = Image.open(MEDIA_PNG).convert('RGB')
-        for fx, fy, fw, fh, _src in foreign:
+    if MODE == 'full' and foreign:
+        override = Image.open(MEDIA_PNG).convert('RGB') if MEDIA_PNG else None
+        pics = {}
+        for fx, fy, fw, fh, src in foreign:
+            pic = override
+            if pic is None:
+                if src not in pics:
+                    pics[src] = decode_part(z, src)
+                    if pics[src] is None and src:
+                        print(f'warning: cannot decode embedded picture: {src}',
+                              file=sys.stderr)
+                pic = pics[src]
+            if pic is None:
+                continue
             x0 = (fx - minx + MARGIN) * SU
             y0 = (maxy + MARGIN - (fy + fh)) * SU
             img.paste(pic.resize((int(fw * SU), int(fh * SU))), (int(x0), int(y0)))
