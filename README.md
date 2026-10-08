@@ -30,6 +30,14 @@ $ visiorender 图.vsdx
 
 ## 装
 
+**[⬇ 下载发行包](https://github.com/Offblink/VisioRender/releases/latest)** 里的 wheel：
+
+```
+pip install visiorender-0.1.0-py3-none-any.whl
+```
+
+或者从源码装：
+
 ```
 pip install .              # 只用它
 pip install -e ".[dev]"    # 还要跑测试和 lint
