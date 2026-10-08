@@ -5,7 +5,7 @@ description = "把 Visio .vsdx 画成 PNG —— 不用装 Visio"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dependencies = ["Pillow>=10.0"]
+dependencies = ["Pillow>=10.0", "numpy>=1.24"]
 
 [project.scripts]
 visiorender = "visiorender.cli:main"
