@@ -1,0 +1,75 @@
+[project]
+name = "visiorender"
+version = "0.1.0"
+description = "把 Visio .vsdx 画成 PNG —— 不用装 Visio"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["Pillow>=10.0"]
+
+[project.scripts]
+visiorender = "visiorender.cli:main"
+
+[project.optional-dependencies]
+dev = ["ruff==0.16.10", "pytest==9.1.1"]
+
+[tool.setuptools.package-data]
+# the file association shows assets/icon.ico, so ship it with the package
+visiorender = ["assets/*.svg", "assets/*.ico"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+    "PL",  # pylint
+    "ARG", # unused arguments
+    "PTH", # use pathlib
+    "RET", # return simplification
+]
+ignore = [
+    "E501",    # line length (ruff format already keeps code wrapped)
+    "PLR0911", # too many return statements
+    "PLR0912", # too many branches
+    "PLR0913", # too many arguments
+    "PLR0915", # too many statements
+    "PLR2004", # magic values (protocol constants)
+    "SIM108",  # ternary instead of if/else (readability)
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The engine is one long pipeline; these fire on the shape of the code, not on
+# defects: uppercase names mirror Visio's own cells (Width/PinX/LineWeight) and
+# the script's geometry locals, and the nested helpers (xf, acell, style) are
+# always consumed inside the very iteration that defines them.
+"visiorender/render.py" = [
+    "PLR0914",
+    "PLR0915",
+    "PLR0912",
+    "PLR0917",
+    "C901",
+    "B023",
+    "N802",
+    "N803",
+    "N806",
+]
+# Tests: deferred imports, throwaway fixture arguments and helper signatures
+# with many positional parameters are idioms here
+"tests/**" = ["PLC0415", "ARG001", "ARG002", "ARG005", "RUF012", "PLR0917"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

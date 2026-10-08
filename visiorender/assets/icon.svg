@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="VisioRender">
+  <title>VisioRender</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5B82D6"/>
+      <stop offset="1" stop-color="#3B5FB0"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded tile -->
+  <rect width="512" height="512" rx="112" fill="url(#tile)"/>
+  <!-- magnifier lens -->
+  <circle cx="200" cy="200" r="130" fill="#FFFFFF" fill-opacity="0.16"
+          stroke="#FFFFFF" stroke-width="26"/>
+  <!-- magnifier handle -->
+  <path d="M 300 300 L 396 396" fill="none" stroke="#FFFFFF"
+        stroke-width="44" stroke-linecap="round"/>
+  <!-- letter V, drawn as a polygon so no font is needed -->
+  <polygon points="125,130 171,130 200,184 229,130 275,130 200,270" fill="#FFFFFF"/>
+</svg>
